@@ -11,11 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"./shield"
 	"github.com/droundy/goopt"
 )
 
 var (
-	wsReplacer = strings.NewReplacer("__", "_", "_", " ")
+	wsReplacer    = strings.NewReplacer("__", "_", "_", " ")
 	revWsReplacer = strings.NewReplacer(" ", "_", "_", "__", "-", "--")
 
 	// set last modifed to server startup. close enough to release.
@@ -23,7 +24,7 @@ var (
 	lastModifiedStr = lastModified.UTC().Format(http.TimeFormat)
 	oneYear         = time.Duration(8700) * time.Hour
 
-	staticPath, _ = resourcePaths()
+	staticPath = "static"
 )
 
 func shift(s []string) ([]string, string) {
@@ -35,7 +36,7 @@ func invalidRequest(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "bad request", 400)
 }
 
-func parseFileName(name string) (d Data, err error) {
+func parseFileName(name string) (d shield.Data, err error) {
 	imageName := wsReplacer.Replace(name)
 	imageParts := strings.Split(imageName, "-")
 
@@ -72,12 +73,12 @@ func parseFileName(name string) (d Data, err error) {
 	}
 
 	cp := newParts[2][0 : len(newParts[2])-4]
-	c, err := getColor(cp)
+	c, err := shield.GetColor(cp)
 	if err != nil {
 		return
 	}
 
-	d = Data{newParts[0], newParts[1], c}
+	d = shield.Data{newParts[0], newParts[1], c}
 	return
 }
 
@@ -106,10 +107,8 @@ func buckle(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("cache-control", "public")
 	w.Header().Add("last-modified", lastModifiedStr)
 
-	makePngShield(w, d)
+	shield.PNG(w, d)
 }
-
-const basePkg = "github.com/jbowes/buckler"
 
 func index(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, filepath.Join(staticPath, "index.html"))
@@ -132,14 +131,14 @@ func cliMode(vendor string, status string, color string, args []string) {
 	}
 
 	if vendor != "" {
-		c, err := getColor(color)
+		c, err := shield.GetColor(color)
 		if err != nil {
 			fatal("Invalid color: " + color)
 		}
-		d := Data{vendor, status, c}
+		d := shield.Data{vendor, status, c}
 
 		name := fmt.Sprintf("%s-%s-%s.png", revWsReplacer.Replace(vendor),
-			revWsReplacer.Replace(status), color);
+			revWsReplacer.Replace(status), color)
 
 		if len(args) > 1 {
 			fatal("You can only specify one output file name")
@@ -158,7 +157,7 @@ func cliMode(vendor string, status string, color string, args []string) {
 			}
 		}
 
-		makePngShield(f, d)
+		shield.PNG(f, d)
 		return
 	}
 
@@ -174,7 +173,7 @@ func cliMode(vendor string, status string, color string, args []string) {
 		if err != nil {
 			fatal(err.Error())
 		}
-		makePngShield(f, d)
+		shield.PNG(f, d)
 	}
 }
 
@@ -202,6 +201,9 @@ func main() {
 
 	goopt.Usage = usage
 
+	// common options
+	dataDir := goopt.String([]string{"-d", "--data-dir"}, "data", "data dir containing base PNG files and font")
+
 	// server mode options
 	host := goopt.String([]string{"-h", "--host"}, hostEnv, "host ip address to bind to")
 	port := goopt.Int([]string{"-p", "--port"}, p, "port to listen on")
@@ -213,6 +215,8 @@ func main() {
 	goopt.Parse(nil)
 
 	args := goopt.Args
+
+	shield.Init(*dataDir)
 
 	// if any of the cli args are given, or positional args remain, assume cli
 	// mode.
