@@ -1,6 +1,7 @@
 package shield
 
 import (
+	"bytes"
 	"errors"
 	"image"
 	"image/color"
@@ -65,29 +66,42 @@ const (
 )
 
 func Init(dataPath string) {
-	fi, err := os.Open(filepath.Join(dataPath, "edge.png"))
+	edgeFile, err := os.Open(filepath.Join(dataPath, "edge.png"))
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer fi.Close()
-
-	edge, err = png.Decode(fi)
+	defer edgeFile.Close()
+	edgeBytes, err := ioutil.ReadAll(edgeFile)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fi, err = os.Open(filepath.Join(dataPath, "gradient.png"))
+	gradientFile, err := os.Open(filepath.Join(dataPath, "gradient.png"))
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer fi.Close()
-
-	gradient, err = png.Decode(fi)
+	defer gradientFile.Close()
+	gradientBytes, err := ioutil.ReadAll(gradientFile)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	fontBytes, err := ioutil.ReadFile(filepath.Join(dataPath, "opensanssemibold.ttf"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	InitWithData(edgeBytes, gradientBytes, fontBytes)
+}
+
+func InitWithData(edgePng []byte, gradientPng []byte, fontBytes []byte) {
+	var err error
+	edge, err = png.Decode(bytes.NewReader(edgePng))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	gradient, err = png.Decode(bytes.NewReader(gradientPng))
 	if err != nil {
 		log.Fatal(err)
 	}
